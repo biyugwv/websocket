@@ -2,12 +2,14 @@ package app
 
 import(
     "websocket/app/im"
+    "websocket/app/log"
     "github.com/gorilla/websocket"
     "net/http"
     "fmt"
     "time"
     "strings"
     "io/ioutil"
+    
 )
 
 var Config map[string]string
@@ -84,7 +86,7 @@ func ws(w http.ResponseWriter, r *http.Request){
 
 
 func Run(){
-    LogInit()     // 日志初始化
+    log.LogInit()     // 日志初始化
     loadConfig()  // 加载配置文件
     im.Run()     //  im初始化 等待conn连接进来
     go FileListener()  // 监听文件变化 暂时没想好干嘛用
