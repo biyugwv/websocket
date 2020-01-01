@@ -6,6 +6,8 @@ import(
 	"os"
 	"sync"
 	"fmt"
+	"runtime"
+	"strconv"
 
 )
 const(
@@ -17,7 +19,6 @@ const(
 
 type appLog struct{
 	updateTime int64  //  更新时间
-	file  *os.File
 	logType  string       // 日志类型
 	logBuffer string      // 日志写入buffer
 	chBuffer chan string
@@ -28,9 +29,10 @@ type appLog struct{
 var allLog = make( map[string] *appLog )
 var  logtypes = []string{INFO,WARNING,ERROR,MESSAGE}
 
-
+func Write(logtype string , msg string){
+	go write(logtype,msg)
+}
 // 将msg写入buffer 
-
 func write(logtype string , msg string){
 	var inarr bool = false
 	for _,v := range logtypes{
@@ -52,34 +54,47 @@ func writeLog(){
 			if len(v.logBuffer) >= v.maxLen || now - v.updateTime >= v.maxTime{
 				// 将buff写入log文件
 				if len(v.logBuffer) > 1{
-					f , err := getFile(v.logType) 
-					if err !=nil {
+					f , err := getFile(v.logType)
+					if err != nil {
 						fmt.Printf("文件创建或读取失败 \n")
 						
 					}
-					v.file = f
-					fmt.Println("写入文件")
+					v.lockFile.Lock() 
+					n,err:=f.WriteString(v.logBuffer)
+					v.lockFile.Unlock()
+					if n != len(v.logBuffer) ||  err !=nil {
+						fmt.Printf("文件写入失败 \n")
+					}
 					v.logBuffer = ""
 					v.updateTime = now
+					
+					f.Close()
 				}
 			}
 			select{
 				case msg:= <- v.chBuffer : 
-					v.logBuffer = v.logBuffer +msg  + "\n"
+					var callfun string
+					_,file,line,ok := runtime.Caller(1)
+					if ok {
+						callfun = file +":" + strconv.Itoa(line) + " time:" + time.Now().Format("206-01-02 15:04:05")
+					}else{
+						callfun = "undefended func" + " time:" + time.Now().Format("206-01-02 15:04:05")
+					}
+					
+					v.logBuffer = v.logBuffer + callfun + "::" +msg  + "\n"
 				default :
-					break
+					//fmt.Printf("没有要写入的buffer\n")
 					
 			}
 		}
-
-		
+		//time.Sleep ( 2000 * time.Millisecond )
 	}
 }
 
 
 func getFile(logtype string)(f *os.File ,err error){
 	
-	filePath := "../websocket/logs/"+time.Now().Format("20160102")+"/"
+	filePath := "../websocket/logs/"+time.Now().Format("20060102")+"/"
 	filename := logtype+".log"
 	f ,err = os.Open(filePath + filename)
 	if err != nil {
@@ -97,7 +112,7 @@ func getFile(logtype string)(f *os.File ,err error){
 		fmt.Printf("%s日志文件打开失败：%s\n",logtype,err)
 		return
 	}
-	f.Close()
+	
 	return
 }
 
@@ -111,6 +126,7 @@ func LogInit(){
 		l.maxLen =  1000
 		l.maxTime =  10
 		l.chBuffer = make(chan string,10)
+		l.lockFile = new(sync.RWMutex)
 		
 		allLog[v] = l
 	}

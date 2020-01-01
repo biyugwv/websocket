@@ -6,6 +6,7 @@ import (
 		"encoding/json"
 		"time"
 		"strconv"
+		"websocket/app/log"
 	)
 
 const  (
@@ -46,22 +47,24 @@ var (
 
 func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
     for{
-        
         select {
             case msg := <- Msg:
-                for _,client := range Clients {
-                    
-                    data, err := json.Marshal(msg)
-                    if err != nil {
-                        fmt.Println("json.Marshal 错误")
-                        return
-                    }
-                    
-                    if err := client.Conn.WriteMessage(websocket.TextMessage, data) ; err != nil {  // 转换成字符串类型便于查看
-                        fmt.Println(err)
-                    }
-                    fmt.Println(string(data))
-                    fmt.Printf("当前在线人数：%d\n",len(Clients))
+            	data, err := json.Marshal(msg)
+                if err != nil {
+                    fmt.Println("json.Marshal 错误")
+                    return
+                }
+            	if len(Clients)>0 {
+	                for _,client := range Clients {
+	                    if err := client.Conn.WriteMessage(websocket.TextMessage, data) ; err != nil {  // 转换成字符串类型便于查看
+	                        fmt.Println(err)
+	                    }
+	                    fmt.Println(string(data))
+	                    log.Write("message",string(data))
+	                    
+	                }
+                }else{
+	                fmt.Println(string(data))
                 }
             case client := <- Join:
                 Clients[client.SSID] = client
@@ -73,9 +76,16 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
                 msg := Message{2,"system",fmt.Sprintf("%s离开了房间",client.SSID)}
                 Msg<-msg
                 delete(Clients, client.SSID)
-               
+            default :
+            	// 检测有没有超时的conn
+            	now  := time.Now().Unix()
+            	for _,client := range Clients {
+	            	if now - client.PingTime>= pingMaxTime{
+			            Leave <- client
+			        }
+            	}
         }
-        
+        time.Sleep( 1000 * time.Millisecond )
     }
 }
 
@@ -83,20 +93,16 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
 //  
 func readMsg(client Client){
     for{
+	    now  := time.Now().Unix()
         if _,ok :=  Clients[client.SSID] ; !ok {  
             fmt.Println("one client remove")
             client.Conn.Close()
             break
         }
-        now  := time.Now().Unix()
-        // 超时没有收到客户端的心跳监测消息 将处理掉该链接
         if client.PingTime == 0 {
             client.PingTime = now
         } 
-        if now - client.PingTime>= pingMaxTime{  
-            Leave <- client
-            return 
-        }
+        
         // 接收数据
         var (
             data []byte
@@ -111,8 +117,8 @@ func readMsg(client Client){
         
         if msgget.MsgType == -1 { // 心跳数据接收
             client.PingTime = now
-            pong(client)  // 向客户端发送监测数据
-        }else if  msgget.MsgType == 0 {      // 此处会报interface{} is  nil  , not int  处理办法是先进行nil判断
+            pong(client)  // 向客户端发送数据
+        }else if  msgget.MsgType == 0 {    
             msg := Message{0,client.SSID,msgget.Msg}
             Msg<-msg
         }else {
@@ -142,7 +148,7 @@ func Run(){
     Clients = make(map [string] Client)      
     Join = make(chan Client ,100)
     Leave = make(chan Client ,100)
-    Msg = make(chan Message ,1000)
+    Msg = make(chan Message ,10000)
 
     go channelLoop()
 
