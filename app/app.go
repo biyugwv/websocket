@@ -72,7 +72,7 @@ func ws(w http.ResponseWriter, r *http.Request){
         fmt.Println(err)
         return
     }
-    var client im.Client
+    client := &im.Client{}
     client.SSID = SSID
     client.Conn = conn
     client.ConnectTime = time.Now().Unix()

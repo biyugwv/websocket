@@ -37,9 +37,9 @@ type receiveMsg  struct {
 }
 
 var (
-    Clients map[string] Client
-    Join  chan Client
-    Leave chan Client
+    Clients map[string] *Client
+    Join  chan *Client
+    Leave chan *Client
     Msg   chan Message
 )
 
@@ -75,14 +75,21 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
             case client := <- Leave:
                 msg := Message{2,"system",fmt.Sprintf("%s离开了房间",client.SSID)}
                 Msg<-msg
+                client.Conn.Close()
                 delete(Clients, client.SSID)
             default :
             	// 检测有没有超时的conn
             	now  := time.Now().Unix()
             	for _,client := range Clients {
-	            	if now - client.PingTime>= pingMaxTime{
+	            	if client.PingTime == 0 {
+		            	client.PingTime = now
+		            	
+		            	fmt.Printf("%s====>%d   %d\n",client.SSID , client.PingTime , now)
+	            	}
+	            	if   now - client.PingTime>= pingMaxTime {
 			            Leave <- client
 			        }
+			       
             	}
         }
         time.Sleep( 1000 * time.Millisecond )
@@ -91,18 +98,14 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
 
 
 //  
-func readMsg(client Client){
+func readMsg(client *Client){
     for{
 	    now  := time.Now().Unix()
         if _,ok :=  Clients[client.SSID] ; !ok {  
             fmt.Println("one client remove")
-            client.Conn.Close()
             break
         }
-        if client.PingTime == 0 {
-            client.PingTime = now
-        } 
-        
+       
         // 接收数据
         var (
             data []byte
@@ -128,7 +131,7 @@ func readMsg(client Client){
 }
 
 
-func pong(client Client){
+func pong(client *Client){
     now  := time.Now().Unix()
     client.PongTime = now
     msg := Message{-2,"system",strconv.FormatInt(now,10)}
@@ -145,9 +148,9 @@ func pong(client Client){
 
 func Run(){
     // 初始化
-    Clients = make(map [string] Client)      
-    Join = make(chan Client ,100)
-    Leave = make(chan Client ,100)
+    Clients = make(map [string] *Client)      
+    Join = make(chan *Client ,100)
+    Leave = make(chan *Client ,100)
     Msg = make(chan Message ,10000)
 
     go channelLoop()

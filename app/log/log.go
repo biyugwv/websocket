@@ -30,6 +30,14 @@ var allLog = make( map[string] *appLog )
 var  logtypes = []string{INFO,WARNING,ERROR,MESSAGE}
 
 func Write(logtype string , msg string){
+	var callfun string
+	_,file,line,ok := runtime.Caller(1)
+	if ok {
+		callfun = file +":" + strconv.Itoa(line) + " time:" + time.Now().Format("2006-01-02 15:04:05")
+	}else{
+		callfun = "undefended func" + " time:" + time.Now().Format("2006-01-02 15:04:05")
+	}
+	msg = callfun + "::" + msg +"\n"
 	go write(logtype,msg)
 }
 // 将msg写入buffer 
@@ -63,7 +71,7 @@ func writeLog(){
 					n,err:=f.WriteString(v.logBuffer)
 					v.lockFile.Unlock()
 					if n != len(v.logBuffer) ||  err !=nil {
-						fmt.Printf("文件写入失败 \n")
+						fmt.Printf("文件写入失败 %s  %d %d\n",err,n,len(v.logBuffer))
 					}
 					v.logBuffer = ""
 					v.updateTime = now
@@ -73,15 +81,7 @@ func writeLog(){
 			}
 			select{
 				case msg:= <- v.chBuffer : 
-					var callfun string
-					_,file,line,ok := runtime.Caller(1)
-					if ok {
-						callfun = file +":" + strconv.Itoa(line) + " time:" + time.Now().Format("206-01-02 15:04:05")
-					}else{
-						callfun = "undefended func" + " time:" + time.Now().Format("206-01-02 15:04:05")
-					}
-					
-					v.logBuffer = v.logBuffer + callfun + "::" +msg  + "\n"
+					v.logBuffer = v.logBuffer + msg 
 				default :
 					//fmt.Printf("没有要写入的buffer\n")
 					
@@ -96,7 +96,7 @@ func getFile(logtype string)(f *os.File ,err error){
 	
 	filePath := "../websocket/logs/"+time.Now().Format("20060102")+"/"
 	filename := logtype+".log"
-	f ,err = os.Open(filePath + filename)
+	f ,err = os.OpenFile(filePath + filename ,os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
 		err = os.MkdirAll(filePath,os.ModePerm)
 	}else{
