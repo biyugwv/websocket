@@ -17,7 +17,7 @@ type Client struct {
     SSID string             // 登陆后的验证Token
     PingTime int64          // 心跳监测 客户端发起  5秒收不到自动断开
     PongTime int64          // 收到客户端ping消息后发送到客户端
-    Userid string           // 登录用户名
+    Userid string          // 登录用户名
     ConnectTime int64
     lastMsgTime int64
     stat int
@@ -51,13 +51,14 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
             case msg := <- Msg:
             	data, err := json.Marshal(msg)
                 if err != nil {
-                    fmt.Println("json.Marshal 错误")
+                    log.Write("error","json.Marshal 错误")
                     return
                 }
             	if len(Clients)>0 {
 	                for _,client := range Clients {
 	                    if err := client.Conn.WriteMessage(websocket.TextMessage, data) ; err != nil {  // 转换成字符串类型便于查看
-	                        fmt.Println(err)
+	                        
+	                        log.Write("error",fmt.Sprintf("%s",err))
 	                    }
 	                    fmt.Println(string(data))
 	                    log.Write("message",string(data))
@@ -84,7 +85,6 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
 	            	if client.PingTime == 0 {
 		            	client.PingTime = now
 		            	
-		            	fmt.Printf("%s====>%d   %d\n",client.SSID , client.PingTime , now)
 	            	}
 	            	if   now - client.PingTime>= pingMaxTime {
 			            Leave <- client
@@ -92,7 +92,7 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
 			       
             	}
         }
-        time.Sleep( 1000 * time.Millisecond )
+        time.Sleep( 300 * time.Millisecond )
     }
 }
 
@@ -102,7 +102,7 @@ func readMsg(client *Client){
     for{
 	    now  := time.Now().Unix()
         if _,ok :=  Clients[client.SSID] ; !ok {  
-            fmt.Println("one client remove")
+            log.Write("info","one client remove")
             break
         }
        
@@ -125,7 +125,7 @@ func readMsg(client *Client){
             msg := Message{0,client.SSID,msgget.Msg}
             Msg<-msg
         }else {
-            fmt.Println("invilid data：%s",string(data))
+            log.Write("warning",fmt.Sprintf("invalid data：%s from %s ",))
         }
     }
 }
