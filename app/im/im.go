@@ -60,10 +60,9 @@ func channelLoop(){  // 三个channel为空 读取操作会造成阻塞
 	                        
 	                        log.Write("error",fmt.Sprintf("%s",err))
 	                    }
-	                    fmt.Println(string(data))
-	                    log.Write("message",string(data))
-	                    
 	                }
+	                fmt.Println(string(data))
+	                log.Write("message",string(data))
                 }else{
 	                fmt.Println(string(data))
                 }

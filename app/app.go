@@ -18,6 +18,7 @@ func loadConfig(){
     Config = make(map[string]string)
     bytes,err := ioutil.ReadFile("app/app.conf")
     if  err != nil {
+        log.Write("error",fmt.Sprintf("读取文件(app.conf)失败：%s",err))
         fmt.Println("读取文件(app.conf)失败：",err)
         Config["stat"] = "fail"
         return
@@ -48,13 +49,21 @@ func loadConfig(){
     
 }
 
+func recordRequest(r *http.Request ){
+    var requestInfo string
+    requestInfo = "userAgent-" + r.UserAgent() +"|" +"referer-" + r.Referer() +"|" +"remoteAddr-" + r.RemoteAddr +"|"+ "host-" + r.Host +"|" + "requestURI-" + r.RequestURI
+    log.Write("info",requestInfo)
+}
+
 func ws(w http.ResponseWriter, r *http.Request){
     var SSID string
+    recordRequest(r)
     r.ParseForm()
     if len(r.FormValue("SSID")) > 0 {
         SSID = r.FormValue("SSID")
     }else{
         fmt.Println("need SSID")
+        log.Write("info","need SSID")
         return 
     }
     conn, err := (&websocket.Upgrader{

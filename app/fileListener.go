@@ -2,8 +2,9 @@ package app
 
 import(
     //"os/exec"
+    "fmt"
+    "websocket/app/log"
     "github.com/fsnotify/fsnotify"
-    "log"
     "io/ioutil"
     "path/filepath"
 )
@@ -15,7 +16,7 @@ func listenerDir(path string ,watch *fsnotify.Watcher){
     watch.Add(path)
     dir, err := ioutil.ReadDir(path)
     if err != nil {
-        log.Printf("%s not a dir\n",path)
+        log.Write("error",fmt.Sprintf("%s not a dir",path))
         return
     }
     for _, dirchild := range dir {
@@ -32,15 +33,14 @@ func listenerDir(path string ,watch *fsnotify.Watcher){
 func FileListener() {
     watch, err := fsnotify.NewWatcher();
     if err != nil {
-        log.Fatal(err);
+        log.Write("error",fmt.Sprintf("文件监听失败，错误如下：%s",err))
     }
     defer watch.Close();
     
     listenerDir(rootpath,watch)
     
     if err != nil {
-        log.Println("文件监听失败，错误如下：");
-        log.Println(err);
+        log.Write("error",fmt.Sprintf("文件监听失败，错误如下：%s",err))
     }
    
     for {
@@ -49,24 +49,27 @@ func FileListener() {
             {
                
                 if ev.Op&fsnotify.Create == fsnotify.Create {
-                    log.Println("创建文件 : ", ev.Name);
+                    log.Write("info",fmt.Sprintf("创建文件 : ", ev.Name));
                 }
                 if ev.Op&fsnotify.Write == fsnotify.Write {
-                    log.Println("写入文件 : ", ev.Name);
+                    log.Write("info",fmt.Sprintf("写入文件 : ", ev.Name));
+                    
                 }
                 if ev.Op&fsnotify.Remove == fsnotify.Remove {
-                    log.Println("删除文件 : ", ev.Name);
+                    log.Write("info",fmt.Sprintf("删除文件 : ", ev.Name));
+                    
                 }
                 if ev.Op&fsnotify.Rename == fsnotify.Rename {
-                    log.Println("重命名文件 : ", ev.Name);
+                    log.Write("info",fmt.Sprintf("重命名文件 : ", ev.Name));
+                    
                 }
                 if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
-                    log.Println("修改权限 : ", ev.Name);
+                    log.Write("info",fmt.Sprintf("修改权限 : ", ev.Name));
                 }
             }
         case err := <-watch.Errors:
             {
-                log.Println("error : ", err);
+                log.Write("error", fmt.Sprintf("%s",err));
                 return;
             }
         }
