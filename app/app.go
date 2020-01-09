@@ -3,51 +3,16 @@ package app
 import(
     "websocket/app/im"
     "websocket/app/log"
+    "websocket/app/lib"
     "github.com/gorilla/websocket"
     "net/http"
     "fmt"
     "time"
-    "strings"
-    "io/ioutil"
+    
     
 )
 
-var Config map[string]string
 
-func loadConfig(){
-    Config = make(map[string]string)
-    bytes,err := ioutil.ReadFile("app/app.conf")
-    if  err != nil {
-        log.Write("error",fmt.Sprintf("读取文件(app.conf)失败：%s",err))
-        fmt.Println("读取文件(app.conf)失败：",err)
-        Config["stat"] = "fail"
-        return
-    }
-    s := string(bytes)
-    if len(s) > 0 {
-        b := strings.Split(s,"\n")
-        for  _,v := range b{
-            if v =  strings.TrimSpace(v) ; v !="" {
-                c := strings.Split(v,"=")
-                ck := strings.TrimSpace(c[0])
-                cv := strings.TrimSpace(c[1])
-                if len(c) == 2 && ck!="" && cv!="" {
-                    Config[ck] = strings.Trim(cv,`"`)
-                     
-                }
-            }
-             
-        }
-
-        if _,ok := Config["stat"] ; !ok{
-            Config["stat"] = "success"
-        }
-    }else{
-        Config["stat"] = "none"
-    }
-    
-    
-}
 
 func recordRequest(r *http.Request ){
     var requestInfo string
@@ -55,9 +20,35 @@ func recordRequest(r *http.Request ){
     log.Write("info",requestInfo)
 }
 
-func ws(w http.ResponseWriter, r *http.Request){
-    var SSID string
+// 登录获取SSID
+
+func login(w http.ResponseWriter, r *http.Request){
     recordRequest(r)
+    r.ParseForm()
+    var username,password string
+    if len(r.FormValue("username")) > 0 {
+        username = r.FormValue("username")
+    }else{
+        w.Write([]byte("请填写姓名"))
+    }
+    if len(r.FormValue("password")) > 0 {
+        password = r.FormValue("password")
+    }else{
+        w.Write([]byte("请填写密码"))
+    }
+    log.Write("info",fmt.Sprintf("登录：username(%s),password(%p)",username,password))
+    if username == "admin" && password == "admin123" {
+        SSID := lib.AESEncodeStr( username ,"login_to_get_sid")
+        lib.RedisPut(SSID,username,3600)
+        w.Write([]byte(SSID))
+    }else{
+        w.Write([]byte("账号密码错误"))
+    }
+}
+
+func ws(w http.ResponseWriter, r *http.Request){
+    recordRequest(r)
+    var SSID string
     r.ParseForm()
     if len(r.FormValue("SSID")) > 0 {
         SSID = r.FormValue("SSID")
@@ -96,11 +87,11 @@ func ws(w http.ResponseWriter, r *http.Request){
 
 func Run(){
     log.LogInit()     // 日志初始化
-    loadConfig()  // 加载配置文件
     im.Run()     //  im初始化 等待conn连接进来
     go FileListener()  // 监听文件变化 暂时没想好干嘛用
     
     http.HandleFunc("/", ws)
-    http.ListenAndServe(":"+Config["port"], nil)
-    fmt.Println("端口监听：",Config["port"])
+    http.HandleFunc("/login", login)
+    log.Write("info",fmt.Sprintf("端口监听：%s",lib.Config("port")))
+    http.ListenAndServe(":"+ lib.Config("port"), nil)
 }
