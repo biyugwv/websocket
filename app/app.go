@@ -25,6 +25,7 @@ func recordRequest(r *http.Request ){
 func login(w http.ResponseWriter, r *http.Request){
     recordRequest(r)
     r.ParseForm()
+    w.Header().Set("Access-Control-Allow-Origin","*")
     var username,password string
     if len(r.FormValue("username")) > 0 {
         username = r.FormValue("username")
@@ -37,7 +38,7 @@ func login(w http.ResponseWriter, r *http.Request){
         w.Write([]byte("请填写密码"))
     }
     log.Write("info",fmt.Sprintf("登录：username(%s),password(%p)",username,password))
-    if username == "admin" && password == "admin123" {
+    if (username == "admin" && password == "admin123") || (username == "admin" && password == "admin456") {
         SSID := lib.AESEncodeStr( username ,"login_to_get_sid")
         lib.RedisPut(SSID,username,3600)
         w.Write([]byte(SSID))
@@ -52,8 +53,13 @@ func ws(w http.ResponseWriter, r *http.Request){
     r.ParseForm()
     if len(r.FormValue("SSID")) > 0 {
         SSID = r.FormValue("SSID")
+        if uname := lib.RedisGet(SSID); uname =="" {
+            fmt.Printf("SSID验证失败：%s\n",SSID)
+            log.Write("info",fmt.Sprintf("SSID验证失败：%s",SSID))
+            return
+        }
     }else{
-        fmt.Println("need SSID")
+        fmt.Printf("need SSID")
         log.Write("info","need SSID")
         return 
     }
@@ -79,8 +85,9 @@ func ws(w http.ResponseWriter, r *http.Request){
     // 如果用户列表中没有该用户
     if _,ok := im.Clients[SSID] ; !ok  {
         im.Join <- client
-    }else{
-        fmt.Println("该用户已在线")
+    }else{  //挤掉
+        im.Leave <- im.Clients[SSID]
+        im.Join <- client
     }
 }
 

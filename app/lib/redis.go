@@ -27,7 +27,7 @@ func RedisGet(key string) string {
         
         val , err := client.Get(key).Result() 
         if  err !=nil {
-            panic(err)
+            return ""
         }
         return  val
 }
