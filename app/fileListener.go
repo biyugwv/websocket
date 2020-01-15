@@ -22,8 +22,10 @@ func listenerDir(path string ,watch *fsnotify.Watcher){
     for _, dirchild := range dir {
         if dirchild.IsDir() { // 目录, 递归遍历
             if string(dirchild.Name()[0]) !="."{
-                pathchild := path+"/"+dirchild.Name()
-                listenerDir(pathchild ,watch)
+                if  dirchild.Name() != "logs" {
+                    pathchild := path+"/"+dirchild.Name()
+                    listenerDir(pathchild ,watch)
+                }
             }
         } 
     }

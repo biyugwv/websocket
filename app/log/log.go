@@ -82,7 +82,7 @@ func writeLog(){
 			select{
 				case msg:= <- v.chBuffer : 
 					v.logBuffer = v.logBuffer + msg 
-				default :
+				//default :
 					//fmt.Printf("没有要写入的buffer\n")
 					
 			}
